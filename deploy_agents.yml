@@ -1,0 +1,3 @@
+- hosts: windows
+  tasks:
+    - win_ping:
