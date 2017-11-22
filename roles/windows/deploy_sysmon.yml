@@ -1,0 +1,26 @@
+- name: Download Sysmon
+  win_get_url:
+    url: https://download.sysinternals.com/files/Sysmon.zip
+    dest: '%TEMP%\Sysmon.zip'
+- name: Unzip Sysmon
+  win_unzip:
+    src: '%TEMP%\winlogbeat-5.6.3-windows-x86_64.zip'
+    dest: '%TEMP%'
+    creates: '%TEMP%\Sysmon'
+    delete_archive: yes
+
+- win_file:
+    path: 'C:\Program Files\Sysmon'
+    state: directory
+
+- name: Copy Sysmon Contents
+  win_copy:
+    src: '%TEMP%\Sysmon\'
+    dest: 'C:\Program Files\Sysmon'
+    remote_src: yes
+
+- name: Install Sysmon
+  win_shell: .\sysmon.exe
+  args:
+    chdir: C:\Program Files\Sysmon
+
