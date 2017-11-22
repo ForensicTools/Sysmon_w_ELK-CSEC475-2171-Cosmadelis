@@ -2,18 +2,17 @@
 # By: Michael Cosmadelis
 #
 # Resources: https://www.digitalocean.com/community/tutorials/how-to-install-elasticsearch-logstash-and-kibana-elk-stack-on-centos-7
+#	     https://github.com/ForensicTools/ossecKibanaElkonWindows-475-2161_bornholm/
 #
 
+set -x
+set -e
 
 if [ "$(id -u)" != "0" ]; then
    echo "This script must be run as root" 1>&2
    exit 1
 fi
 
-# get kibanaadmin password
-echo "Please enter a password for kibanaadmin: "
-
-read pass
 # Install Java
 yum install -y java
 
@@ -49,16 +48,20 @@ enabled=1
 
 yum install -y kibana
 
+
+systemctl start kibana
+
 # nginx install
 yum install -y epel-release
 yum install -y nginx httpd-tools
+yum install certbot -y
 
-htpasswd -c /etc/nginx/htpasswd.users $pass
+htpasswd -c /etc/nginx/htpasswd.users kibanaadmin
 
 cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
-mv /conf/nginx/nginx.conf /etc/nginx/nginx.conf
+mv conf/nginx/nginx.conf /etc/nginx/nginx.conf
 
-exho 'server {
+echo 'server {
     listen 80;
 
     server_name example.com;
@@ -70,16 +73,70 @@ exho 'server {
         proxy_pass http://localhost:5601;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
+        proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
         proxy_cache_bypass $http_upgrade;        
     }
 }
 ' | tee /etc/nginx/conf.d/kibana.conf
 
+echo 'server {
+  listen 80;
+  location ~ /.well-known {
+      allow all;
+  }
+}
+' | tee /etc/nginx/conf.d/letsencrypt.conf
 
 
 systemctl start nginx
+
+mkdir /etc/nginx/ssl
+  mkdir -p .well-known/acme-challenge
+  certbot certonly -a webroot --webroot-path=/usr/share/nginx/html -d $domain
+  openssl dhparam -out /etc/nginx/ssl/dhparam.pem 2048
+
+  rm -rf /etc/nginx/conf.d/letsencrypt.conf
+
+echo "server {
+    listen 443 ssl;
+    server_name "$domain";
+    ssl_certificate /etc/letsencrypt/live/"$domain"/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/"$domain"/privkey.pem;
+    ssl_dhparam /etc/nginx/ssl/dhparam.pem;
+    ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:50m;
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    add_header Strict-Transport-Security max-age=15768000;
+    location ~ /.well-known {
+        allow all;
+    }
+    auth_basic 'Restricted Access';
+    auth_basic_user_file /etc/nginx/htpasswd.users;
+    location / {
+        proxy_pass http://localhost:5601;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+" | tee /etc/nginx/conf.d/kibana.conf
+systemctl enable nginx
+systemctl restart nginx
+setsebool -P httpd_can_network_connect 1
+
+echo "30 2 * * 1 /usr/bin/letsencrypt renew >> /var/log/le-renew.log
+35 2 * * 1 /bin/systemctl reload nginx" >> /etc/crontab
+systemctl start crond
+
+
+
 systemctl enable nginx
 
 
@@ -94,6 +151,4 @@ enabled=1
 ' | tee /etc/yum.repos.d/logstash.repo
 
 yum -y install logstash
-
-
 
