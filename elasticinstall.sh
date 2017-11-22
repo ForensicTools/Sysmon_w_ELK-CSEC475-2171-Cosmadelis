@@ -4,25 +4,32 @@
 # Resources: https://www.digitalocean.com/community/tutorials/how-to-install-elasticsearch-logstash-and-kibana-elk-stack-on-centos-7
 #
 
+
+if [ "$(id -u)" != "0" ]; then
+   echo "This script must be run as root" 1>&2
+   exit 1
+fi
+
 # get kibanaadmin password
 echo "Please enter a password for kibanaadmin: "
 
 read pass
-
 # Install Java
 yum install -y java
 
 # Install elasticsearch
 
 rpm --import https://packages.elastic.co/GPG-KEY-elasticsearch
-echo "[elastic-5.x]" > /etc/yum.repos.d/elastic.repo
-echo "name=Elastic repository for 5.x packages" >> /etc/yum.repos.d/elastic.repo
-echo "baseurl=https://artifacts.elastic.co/packages/5.x/yum" >> /etc/yum.repos.d/elastic.repo
-echo "gpgcheck=1" >> /etc/yum.repos.d/elastic.repo
-echo "gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch" >> /etc/yum.repos.d/elastic.repo
-echo "enabled=1" >> /etc/yum.repos.d/elastic.repo
-echo "autorefresh=1" >> /etc/yum.repos.d/elastic.repo
-echo "type=rpm-md" >> /etc/yum.repos.d/elastic.repo
+
+echo '[elastic-5.x]
+name=Elastic repository for 5.x packages
+baseurl=https://artifacts.elastic.co/packages/5.x/yum
+gpgcheck=1
+gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+enabled=1
+autorefresh=1
+type=rpm-md
+' | tee /etc/yum.repos.d/elastic.repo
 
 yum install -y elasticsearch
 systemctl daemon-reload
@@ -32,12 +39,13 @@ systemctl start elasticsearch.service
 # Install Kibana
 echo "Installing kibana..."
 
-echo "[kibana-4.4]" > /etc/yum.repos.d/kibana.repo
-echo "name=Kibana repository for 4.4.x packages" >> /etc/yum.repos.d/kibana.repo
-echo "baseurl=http://packages.elastic.co/kibana/4.4/centos" >> /etc/yum.repos.d/kibana.repo
-echo "gpgcheck=1" >> /etc/yum.repos.d/kibana.repo
-echo "gpgkey=http://packages.elastic.co/GPG-KEY-elasticsearch" >> /etc/yum.repos.d/kibana.repo
-echo "enabled=1" >> /etc/yum.repos.d/kibana.repo
+echo '[kibana-4.4]
+name=Kibana repository for 4.4.x packages
+baseurl=http://packages.elastic.co/kibana/4.4/centos
+gpgcheck=1
+gpgkey=http://packages.elastic.co/GPG-KEY-elasticsearch
+enabled=1
+' | tee /etc/yum.repos.d/kibana.repo
 
 yum install -y kibana
 
@@ -47,25 +55,45 @@ yum install -y nginx httpd-tools
 
 htpasswd -c /etc/nginx/htpasswd.users $pass
 
+cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
+mv /conf/nginx/nginx.conf /etc/nginx/nginx.conf
+
+exho 'server {
+    listen 80;
+
+    server_name example.com;
+
+    auth_basic "Restricted Access";
+    auth_basic_user_file /etc/nginx/htpasswd.users;
+
+    location / {
+        proxy_pass http://localhost:5601;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;        
+    }
+}
+' | tee /etc/nginx/conf.d/kibana.conf
+
+
+
 systemctl start nginx
 systemctl enable nginx
 
-# have to then remove the server block, not being done yet
-
-echo "server {" > /etc/nginx/conf.d/kibana.conf
-echo -e "\tlisten 80;" >> /etc/nginx/conf.d/kibana.conf
-echo -e "\tserver_name domain.com" >> /etc/nginx/conf.d/kibana.conf 
-echo -e "\tauth_basic 'Restricted Access'" >> /etc/nginx/conf.d/kibana.conf
-echo -e "\tlocation / {" >> /etc/nginx/conf.d/kibana.conf
-echo -e "\t\tproxy_pass http://localhost:5601 " >> /etc/nginx/conf.d/kibana.conf
-echo -e "\t\tproxy_http_version 1.1" >> /etc/nginx/conf.d/kibana.conf
-echo -e "\t\tproxy_set_header Upgrade $http_upgrade" >> /etc/nginx/conf.d/kibana.conf
-echo -e "\t\tproxy_set_header Connection 'upgrade'" >> /etc/nginx/conf.d/kibana.conf
-echo -e "\t\tproxy_set_header Host $host" >> /etc/nginx/conf.d/kibana.conf
-echo -e "\t\tproxy_cache_bypass $http_upgrade" >> /etc/nginx/conf.d/kibana.conf
-echo -e "\t}" >> /etc/nginx/conf.d/kibana.conf
-echo -e "}" >> /etc/nginx/conf.d/kibana.conf
 
 # Install Logstash
 # need to set configurations
+echo '[logstash-2.2]
+name=logstash repository for 2.2 packages
+baseurl=http://packages.elasticsearch.org/logstash/2.2/centos
+gpgcheck=1
+gpgkey=http://packages.elasticsearch.org/GPG-KEY-elasticsearch
+enabled=1
+' | tee /etc/yum.repos.d/logstash.repo
+
 yum -y install logstash
+
+
+
