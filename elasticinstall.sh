@@ -135,13 +135,11 @@ echo "30 2 * * 1 /usr/bin/letsencrypt renew >> /var/log/le-renew.log
 35 2 * * 1 /bin/systemctl reload nginx" >> /etc/crontab
 systemctl start crond
 
-
-
 systemctl enable nginx
-
 
 # Install Logstash
 # need to set configurations
+
 echo '[logstash-2.2]
 name=logstash repository for 2.2 packages
 baseurl=http://packages.elasticsearch.org/logstash/2.2/centos
