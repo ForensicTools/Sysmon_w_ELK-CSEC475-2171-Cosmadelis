@@ -5,6 +5,10 @@
 #	     https://github.com/ForensicTools/ossecKibanaElkonWindows-475-2161_bornholm/
 #
 
+#SELinux muse be set to permissive
+
+setenforce 0
+
 set -x
 set -e
 
@@ -48,7 +52,7 @@ enabled=1
 
 yum install -y kibana
 
-
+systemctl daemon-reaload
 systemctl start kibana
 
 # nginx install
@@ -92,17 +96,17 @@ echo 'server {
 systemctl start nginx
 
 mkdir /etc/nginx/ssl
-  mkdir -p .well-known/acme-challenge
-  certbot certonly -a webroot --webroot-path=/usr/share/nginx/html -d $domain
-  openssl dhparam -out /etc/nginx/ssl/dhparam.pem 2048
 
-  rm -rf /etc/nginx/conf.d/letsencrypt.conf
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/nginx/ssl/nginx-selfsigned.key -out /etc/nginx/ssl/nginx-selfsigned.crt
+openssl dhparam -out /etc/nginx/ssl/dhparam.pem 2048
+
+rm -rf /etc/nginx/conf.d/letsencrypt.conf
 
 echo "server {
     listen 443 ssl;
-    server_name "$domain";
-    ssl_certificate /etc/letsencrypt/live/"$domain"/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/"$domain"/privkey.pem;
+    server_name _;
+    ssl_certificate /etc/nginx/ssl/nginx-selfsigned.crt;
+    ssl_certificate_key /etc/nginx/ssl/nginx-selfsigned.key;
     ssl_dhparam /etc/nginx/ssl/dhparam.pem;
     ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
     ssl_prefer_server_ciphers on;
@@ -131,9 +135,7 @@ systemctl enable nginx
 systemctl restart nginx
 setsebool -P httpd_can_network_connect 1
 
-echo "30 2 * * 1 /usr/bin/letsencrypt renew >> /var/log/le-renew.log
-35 2 * * 1 /bin/systemctl reload nginx" >> /etc/crontab
-systemctl start crond
+
 
 systemctl enable nginx
 
