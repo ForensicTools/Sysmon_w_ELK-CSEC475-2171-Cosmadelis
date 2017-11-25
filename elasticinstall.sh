@@ -22,12 +22,18 @@ yum install -y java
 yum install -y java-devel
 
 # Install elasticsearch
+echo '[logstash-6.x]
+name=Elastic repository for 6.x packages
+baseurl=https://artifacts.elastic.co/packages/6.x/yum
+gpgcheck=1
+gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+enabled=1
+autorefresh=1
+type=rpm-md
+' | tee /etc/yum.repos.d/logstash.repo
 
-curl -L -O https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-6.0.0.tar.gz
-tar -xvf elasticsearch-6.0.0.tar.gz
-cd elasticsearch-6.0.0/bin
 
-rpm --import https://packages.elastic.co/GPG-KEY-elasticsearch
+rpm --import https://artifacts.elastic.co/GPG-KEY-elasticsearch
 
 
 yum install -y elasticsearch
@@ -38,6 +44,7 @@ curl -XGET 'http://localhost:9200/_cluster/health?pretty=true'
 systemctl daemon-reload
 systemctl enable elasticsearch.service
 systemctl start elasticsearch.service
+
 
 # Install Kibana
 echo "Installing kibana..."
@@ -63,7 +70,7 @@ yum install certbot -y
 htpasswd -c /etc/nginx/htpasswd.users kibanaadmin
 
 cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
-mv conf/nginx/nginx.conf /etc/nginx/nginx.conf
+yes | cp -f conf/nginx/nginx.conf /etc/nginx/nginx.conf
 
 echo 'server {
     listen 80;
@@ -176,6 +183,7 @@ EOF
 systemctl restart logstash
 systemctl enable logstash
 
+# Install/Configure firewall
 sudo yum install firewalld -y
 sudo systemctl start firewalld
 sudo systemctl enable firewalld
