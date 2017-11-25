@@ -5,7 +5,7 @@
 #	     https://github.com/ForensicTools/ossecKibanaElkonWindows-475-2161_bornholm/
 #
 
-#SELinux muse be set to permissive
+#i SELinux muse be set to permissive
 
 setenforce 0
 
@@ -19,20 +19,16 @@ fi
 
 # Install Java
 yum install -y java
+yum install -y java-devel
 
 # Install elasticsearch
 
+curl -L -O https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-6.0.0.tar.gz
+tar -xvf elasticsearch-6.0.0.tar.gz
+cd elasticsearch-6.0.0/bin
+
 rpm --import https://packages.elastic.co/GPG-KEY-elasticsearch
 
-echo '[elastic-5.x]
-name=Elastic repository for 5.x packages
-baseurl=https://artifacts.elastic.co/packages/5.x/yum
-gpgcheck=1
-gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
-enabled=1
-autorefresh=1
-type=rpm-md
-' | tee /etc/yum.repos.d/elastic.repo
 
 yum install -y elasticsearch
 
@@ -56,7 +52,7 @@ enabled=1
 
 yum install -y kibana
 
-systemctl daemon-reaload
+systemctl daemon-reload
 systemctl start kibana
 
 # nginx install
@@ -155,4 +151,41 @@ enabled=1
 ' | tee /etc/yum.repos.d/logstash.repo
 
 yum -y install logstash
+
+/usr/share/logstash/bin/logstash-plugin install logstash-input-beats
+
+cat > /etc/logstash/conf.d/02-beats-input.conf << EOF
+input {
+beats {
+port => 5044
+ssl => false
+}
+}
+EOF
+
+cat /etc/logstash/conf.d/30-elasticsearch.conf << EOF
+output {
+elasticsearch {
+hosts = ["http://localhost:9200"]
+index = "%{type}-%{[@metadata][beat]}-%{+YYYY.MM.dd}"
+document_type = "%{[@metadata][type]}"
+}
+}
+EOF
+
+systemctl restart logstash
+systemctl enable logstash
+
+sudo yum install firewalld -y
+sudo systemctl start firewalld
+sudo systemctl enable firewalld
+sudo firewall-cmd –zone=public –permanent –add-service=http
+sudo firewall-cmd –zone=public –permanent –add-service=https
+sudo firewall-cmd –zone=public –permanent –add-service=ssh
+sudo firewall-cmd –zone=public –permanent –add-port=5044/tcp
+sudo firewall-cmd –zone=public –permanent –add-port=9200/tcp
+sudo firewall-cmd –reload
+
+
+
 
