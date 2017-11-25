@@ -6,11 +6,11 @@
   win_get_url:
     url: https://download.sysinternals.com/files/Sysmon.zip
     dest: '%TEMP%\Sysmon.zip'
+
 - name: Unzip Sysmon
   win_unzip:
     src: '%TEMP%\Sysmon.zip'
-    dest: '%TEMP%'
-    creates: '%TEMP%\Sysmon'
+    dest: '%TEMP%\Sysmon'
     delete_archive: yes
 
 - win_file:

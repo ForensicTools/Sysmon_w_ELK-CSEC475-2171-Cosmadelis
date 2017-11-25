@@ -32,7 +32,7 @@
     chdir: C:\Program Files\winlogbeat
 
 - name: Copy Winbeat config
-  win_template:
+  win_copy:
     src: conf/winbeat/winlogbeat.yml
     dest: 'C:\Program Files\winlogbeat\winlogbeat.yml'
 

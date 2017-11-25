@@ -7,7 +7,6 @@ This tool automatically deploys and configures the ELK stack to analyze and visu
 2) cd Sysmon_w_ELK-CSEC475-2171-Cosmadelis
 3) ./elasticinstall.sh
     NOTE: This script sets SELinux to permissive mode
-4) go to "https://YOUR IP OR HOSTNAME" to access the Kibana dashboard
 
 ## Configure Windows for Ansible 
 1) Download the repository to a Windows host

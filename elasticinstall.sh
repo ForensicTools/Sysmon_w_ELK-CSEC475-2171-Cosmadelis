@@ -35,6 +35,10 @@ type=rpm-md
 ' | tee /etc/yum.repos.d/elastic.repo
 
 yum install -y elasticsearch
+
+curl -XGET localhost:9200
+curl -XGET 'http://localhost:9200/_cluster/health?pretty=true'
+
 systemctl daemon-reload
 systemctl enable elasticsearch.service
 systemctl start elasticsearch.service
