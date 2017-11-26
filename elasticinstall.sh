@@ -17,6 +17,8 @@ if [ "$(id -u)" != "0" ]; then
    exit 1
 fi
 
+yum -y update
+
 # Install Java
 yum install -y java
 yum install -y java-devel
