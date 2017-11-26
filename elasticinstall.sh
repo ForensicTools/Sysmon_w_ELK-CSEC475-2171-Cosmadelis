@@ -5,7 +5,7 @@
 #	     https://github.com/ForensicTools/ossecKibanaElkonWindows-475-2161_bornholm/
 #
 
-#i SELinux muse be set to permissive
+# SELinux muse be set to permissive
 
 setenforce 0
 
@@ -38,9 +38,6 @@ rpm --import https://artifacts.elastic.co/GPG-KEY-elasticsearch
 
 yum install -y elasticsearch
 
-curl -XGET localhost:9200
-curl -XGET 'http://localhost:9200/_cluster/health?pretty=true'
-
 systemctl daemon-reload
 systemctl enable elasticsearch.service
 systemctl start elasticsearch.service
@@ -48,14 +45,6 @@ systemctl start elasticsearch.service
 
 # Install Kibana
 echo "Installing kibana..."
-
-echo '[kibana-4.4]
-name=Kibana repository for 4.4.x packages
-baseurl=http://packages.elastic.co/kibana/4.4/centos
-gpgcheck=1
-gpgkey=http://packages.elastic.co/GPG-KEY-elasticsearch
-enabled=1
-' | tee /etc/yum.repos.d/kibana.repo
 
 yum install -y kibana
 
@@ -149,14 +138,6 @@ systemctl enable nginx
 # Install Logstash
 # need to set configurations
 
-echo '[logstash-2.2]
-name=logstash repository for 2.2 packages
-baseurl=http://packages.elasticsearch.org/logstash/2.2/centos
-gpgcheck=1
-gpgkey=http://packages.elasticsearch.org/GPG-KEY-elasticsearch
-enabled=1
-' | tee /etc/yum.repos.d/logstash.repo
-
 yum -y install logstash
 
 /usr/share/logstash/bin/logstash-plugin install logstash-input-beats
@@ -193,7 +174,4 @@ sudo firewall-cmd –zone=public –permanent –add-service=ssh
 sudo firewall-cmd –zone=public –permanent –add-port=5044/tcp
 sudo firewall-cmd –zone=public –permanent –add-port=9200/tcp
 sudo firewall-cmd –reload
-
-
-
 
