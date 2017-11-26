@@ -140,26 +140,25 @@ systemctl enable nginx
 
 yum -y install logstash
 
+
+echo'input {
+	beats {
+		port => 5044
+		ssl => false
+	}
+}
+' | tee /etc/logstash/conf.d/02-beats-input.conf
+
+echo 'output {
+	elasticsearch {
+		hosts = ["http://localhost:9200"]
+		index = "%{type}-%{[@metadata][beat]}-%{+YYYY.MM.dd}"
+		document_type = "%{[@metadata][type]}"
+	}
+}
+' | tee /etc/logstash/conf.d/30-elasticsearch.conf
+
 /usr/share/logstash/bin/logstash-plugin install logstash-input-beats
-
-cat > /etc/logstash/conf.d/02-beats-input.conf << EOF
-input {
-beats {
-port => 5044
-ssl => false
-}
-}
-EOF
-
-cat /etc/logstash/conf.d/30-elasticsearch.conf << EOF
-output {
-elasticsearch {
-hosts = ["http://localhost:9200"]
-index = "%{type}-%{[@metadata][beat]}-%{+YYYY.MM.dd}"
-document_type = "%{[@metadata][type]}"
-}
-}
-EOF
 
 systemctl restart logstash
 systemctl enable logstash
