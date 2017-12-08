@@ -1,0 +1,2 @@
+[windows]
+*REPLACE WITH IP/HOSTNAMES*

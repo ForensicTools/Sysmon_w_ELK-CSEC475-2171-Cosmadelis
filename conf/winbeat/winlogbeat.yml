@@ -1,0 +1,145 @@
+###################### Winlogbeat Configuration Example ##########################
+# This file is an example configuration file highlighting only the most common
+# options. The winlogbeat.reference.yml file from the same directory contains all the
+# supported options with more comments. You can use it as a reference.
+#
+# You can find the full configuration reference here:
+# https://www.elastic.co/guide/en/beats/winlogbeat/index.html
+
+#======================= Winlogbeat specific options ==========================
+
+# event_logs specifies a list of event logs to monitor as well as any
+# accompanying options. The YAML data type of event_logs is a list of
+# dictionaries.
+#
+# The supported keys are name (required), tags, fields, fields_under_root,
+# forwarded, ignore_older, level, event_id, provider, and include_xml. Please
+# visit the documentation for the complete details of each option.
+# https://go.es.io/WinlogbeatConfig
+winlogbeat.event_logs:
+  - name: Security
+    event_id: 4740,4728,4732,4756,4735,4724,4625,4648,1102,4624,5038,6281
+    ignore_older: 72h
+  - name: Application
+    event_id: 1000,1002,1001
+    ignore_older: 72h
+  - name: "Microsoft-Windows-TaskScheduler/Operational"
+    event_id: 141,106,142,140,129
+    ignore_older: 72h
+  - name: System
+    event_id: 104,102,1102,4719,6005,7022,7023,7024,7025,7026,7031,7032,7034,7045,4697,7022,7023,104,6
+    ignore_older: 72h
+  - name: "Microsoft-Windows-Application-Experience/Program-Inventory"
+    event_id: 903,904
+    ignore_older: 72h
+  - name: "Microsoft-Windows-Sysmon/Operational"
+    ignore_older: 72h
+  - name: "Microsoft-Windows-TerminalServices-RDPClient/Operational,Microsoft-Windows-TerminalServices-LocalSessionManager/Admin,Microsoft-Windows-TerminalServices-LocalSessionManager/Operational"
+    event_id: 23,24,25,1102
+    ignore_older: 72h
+  - name: "Microsoft-Windows-Windows Firewall With Advanced Security/ConnectionSecurity,Microsoft-Windows-Windows Firewall With Advanced Security/ConnectionSecurityVerbose,Microsoft-Windows-Windows Firewall With Advanced Security/Firewall,Microsoft-Windows-Windows Firewall With Advanced Security/FirewallVerbose,Microsoft-Windows-Windows Firewall With Advanced Security/Network Isolation Operational"
+    event_id: 2004,2005,2006,2033,2009
+    ignore_older: 72h
+  - name: "Microsoft-Windows-WindowsUpdateClient/Operational"
+    event_id: 20,24,25,31,34,35
+    ignore_older: 72h
+#==================== Elasticsearch template setting ==========================
+
+#setup.template.settings:
+#  index.number_of_shards: 3
+  #index.codec: best_compression
+  #_source.enabled: false
+
+#================================ General =====================================
+
+# The name of the shipper that publishes the network data. It can be used to group
+# all the transactions sent by a single shipper in the web interface.
+#name:
+
+# The tags of the shipper are included in their own field with each
+# transaction published.
+#tags: ["service-X", "web-tier"]
+
+# Optional fields that you can specify to add additional information to the
+# output.
+#fields:
+#  env: staging
+
+
+#============================== Dashboards =====================================
+# These settings control loading the sample dashboards to the Kibana index. Loading
+# the dashboards is disabled by default and can be enabled either by setting the
+# options here, or by using the `-setup` CLI flag or the `setup` command.
+#setup.dashboards.enabled: false
+
+# The URL from where to download the dashboards archive. By default this URL
+# has a value which is computed based on the Beat name and version. For released
+# versions, this URL points to the dashboard archive on the artifacts.elastic.co
+# website.
+#setup.dashboards.url:
+
+#============================== Kibana =====================================
+
+# Starting with Beats version 6.0.0, the dashboards are loaded via the Kibana API.
+# This requires a Kibana endpoint configuration.
+#setup.kibana:
+  #host: "172.16.219.198:5601"
+  # Kibana Host
+  # Scheme and port can be left out and will be set to the default (http and 5601)
+  # In case you specify and additional path, the scheme is required: http://localhost:5601/path
+  # IPv6 addresses should always be defined as: https://[2001:db8::1]:5601
+  #host: "localhost:5601"
+
+#============================= Elastic Cloud ==================================
+
+# These settings simplify using winlogbeat with the Elastic Cloud (https://cloud.elastic.co/).
+
+# The cloud.id setting overwrites the `output.elasticsearch.hosts` and
+# `setup.kibana.host` options.
+# You can find the `cloud.id` in the Elastic Cloud web UI.
+#cloud.id:
+
+# The cloud.auth setting overwrites the `output.elasticsearch.username` and
+# `output.elasticsearch.password` settings. The format is `<user>:<pass>`.
+#cloud.auth:
+
+#================================ Outputs =====================================
+
+# Configure what outputs to use when sending the data collected by the beat.
+# Multiple outputs may be used.
+
+#-------------------------- Elasticsearch output ------------------------------
+output.elasticsearch:
+  # Array of hosts to connect to.
+  hosts: ["172.16.219.198:9200"]
+
+  # Optional protocol and basic auth credentials.
+  #protocol: "https"
+  #username: "elastic"
+  #password: "changeme"
+
+#----------------------------- Logstash output --------------------------------
+output.logstash:
+  # The Logstash hosts
+  hosts: ["172.16.219.198:5044"]
+
+  # Optional SSL. By default is off.
+  # List of root certificates for HTTPS server verifications
+  #ssl.certificate_authorities: ["/etc/pki/root/ca.pem"]
+
+  # Certificate for SSL client authentication
+  #ssl.certificate: "/etc/pki/client/cert.pem"
+
+  # Client Certificate Key
+  #ssl.key: "/etc/pki/client/cert.key"
+
+#================================ Logging =====================================
+
+# Sets log level. The default log level is info.
+# Available log levels are: critical, error, warning, info, debug
+#logging.level: debug
+
+# At debug level, you can selectively enable logging only for some components.
+# To enable all selectors use ["*"]. Examples of other selectors are "beat",
+# "publish", "service".
+#logging.selectors: ["*"]

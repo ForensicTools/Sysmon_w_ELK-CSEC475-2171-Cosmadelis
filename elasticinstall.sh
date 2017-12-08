@@ -2,70 +2,177 @@
 # By: Michael Cosmadelis
 #
 # Resources: https://www.digitalocean.com/community/tutorials/how-to-install-elasticsearch-logstash-and-kibana-elk-stack-on-centos-7
+#	     https://github.com/ForensicTools/ossecKibanaElkonWindows-475-2161_bornholm/
 #
 
-# get kibanaadmin password
-echo "Please enter a password for kibanaadmin: "
+# SELinux muse be set to permissive
 
-read pass
+setenforce 0
+
+set -x
+set -e
+
+if [ "$(id -u)" != "0" ]; then
+   echo "This script must be run as root" 1>&2
+   exit 1
+fi
+
+yum -y update
 
 # Install Java
 yum install -y java
+yum install -y java-devel
 
 # Install elasticsearch
+echo '[logstash-6.x]
+name=Elastic repository for 6.x packages
+baseurl=https://artifacts.elastic.co/packages/6.x/yum
+gpgcheck=1
+gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+enabled=1
+autorefresh=1
+type=rpm-md
+' | tee /etc/yum.repos.d/logstash.repo
 
-rpm --import https://packages.elastic.co/GPG-KEY-elasticsearch
-echo "[elastic-5.x]" > /etc/yum.repos.d/elastic.repo
-echo "name=Elastic repository for 5.x packages" >> /etc/yum.repos.d/elastic.repo
-echo "baseurl=https://artifacts.elastic.co/packages/5.x/yum" >> /etc/yum.repos.d/elastic.repo
-echo "gpgcheck=1" >> /etc/yum.repos.d/elastic.repo
-echo "gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch" >> /etc/yum.repos.d/elastic.repo
-echo "enabled=1" >> /etc/yum.repos.d/elastic.repo
-echo "autorefresh=1" >> /etc/yum.repos.d/elastic.repo
-echo "type=rpm-md" >> /etc/yum.repos.d/elastic.repo
+
+rpm --import https://artifacts.elastic.co/GPG-KEY-elasticsearch
+
 
 yum install -y elasticsearch
+
 systemctl daemon-reload
 systemctl enable elasticsearch.service
 systemctl start elasticsearch.service
 
+
 # Install Kibana
 echo "Installing kibana..."
 
-echo "[kibana-4.4]" > /etc/yum.repos.d/kibana.repo
-echo "name=Kibana repository for 4.4.x packages" >> /etc/yum.repos.d/kibana.repo
-echo "baseurl=http://packages.elastic.co/kibana/4.4/centos" >> /etc/yum.repos.d/kibana.repo
-echo "gpgcheck=1" >> /etc/yum.repos.d/kibana.repo
-echo "gpgkey=http://packages.elastic.co/GPG-KEY-elasticsearch" >> /etc/yum.repos.d/kibana.repo
-echo "enabled=1" >> /etc/yum.repos.d/kibana.repo
-
 yum install -y kibana
+
+systemctl daemon-reload
+systemctl start kibana
 
 # nginx install
 yum install -y epel-release
 yum install -y nginx httpd-tools
+yum install certbot -y
 
-htpasswd -c /etc/nginx/htpasswd.users $pass
+htpasswd -c /etc/nginx/htpasswd.users kibanaadmin
+
+cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
+yes | cp -f conf/nginx/nginx.conf /etc/nginx/nginx.conf
+
+echo 'server {
+    listen 80;
+
+    server_name example.com;
+
+    auth_basic "Restricted Access";
+    auth_basic_user_file /etc/nginx/htpasswd.users;
+
+    location / {
+        proxy_pass http://localhost:5601;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;        
+    }
+}
+' | tee /etc/nginx/conf.d/kibana.conf
+
+echo 'server {
+  listen 80;
+  location ~ /.well-known {
+      allow all;
+  }
+}
+' | tee /etc/nginx/conf.d/letsencrypt.conf
+
 
 systemctl start nginx
+
+mkdir /etc/nginx/ssl
+
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /etc/nginx/ssl/nginx-selfsigned.key -out /etc/nginx/ssl/nginx-selfsigned.crt
+openssl dhparam -out /etc/nginx/ssl/dhparam.pem 2048
+
+rm -rf /etc/nginx/conf.d/letsencrypt.conf
+
+echo "server {
+    listen 443 ssl;
+    server_name _;
+    ssl_certificate /etc/nginx/ssl/nginx-selfsigned.crt;
+    ssl_certificate_key /etc/nginx/ssl/nginx-selfsigned.key;
+    ssl_dhparam /etc/nginx/ssl/dhparam.pem;
+    ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:50m;
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    add_header Strict-Transport-Security max-age=15768000;
+    location ~ /.well-known {
+        allow all;
+    }
+    auth_basic 'Restricted Access';
+    auth_basic_user_file /etc/nginx/htpasswd.users;
+    location / {
+        proxy_pass http://localhost:5601;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+" | tee /etc/nginx/conf.d/kibana.conf
 systemctl enable nginx
+systemctl restart nginx
+setsebool -P httpd_can_network_connect 1
 
-# have to then remove the server block, not being done yet
 
-echo "server {" > /etc/nginx/conf.d/kibana.conf
-echo -e "\tlisten 80;" >> /etc/nginx/conf.d/kibana.conf
-echo -e "\tserver_name domain.com" >> /etc/nginx/conf.d/kibana.conf 
-echo -e "\tauth_basic 'Restricted Access'" >> /etc/nginx/conf.d/kibana.conf
-echo -e "\tlocation / {" >> /etc/nginx/conf.d/kibana.conf
-echo -e "\t\tproxy_pass http://localhost:5601 " >> /etc/nginx/conf.d/kibana.conf
-echo -e "\t\tproxy_http_version 1.1" >> /etc/nginx/conf.d/kibana.conf
-echo -e "\t\tproxy_set_header Upgrade $http_upgrade" >> /etc/nginx/conf.d/kibana.conf
-echo -e "\t\tproxy_set_header Connection 'upgrade'" >> /etc/nginx/conf.d/kibana.conf
-echo -e "\t\tproxy_set_header Host $host" >> /etc/nginx/conf.d/kibana.conf
-echo -e "\t\tproxy_cache_bypass $http_upgrade" >> /etc/nginx/conf.d/kibana.conf
-echo -e "\t}" >> /etc/nginx/conf.d/kibana.conf
-echo -e "}" >> /etc/nginx/conf.d/kibana.conf
+
+systemctl enable nginx
 
 # Install Logstash
 # need to set configurations
+
 yum -y install logstash
+
+
+echo'input {
+	beats {
+		port => 5044
+		ssl => false
+	}
+}
+' | tee /etc/logstash/conf.d/02-beats-input.conf
+
+echo 'output {
+	elasticsearch {
+		hosts = ["http://localhost:9200"]
+		index = "%{type}-%{[@metadata][beat]}-%{+YYYY.MM.dd}"
+		document_type = "%{[@metadata][type]}"
+	}
+}
+' | tee /etc/logstash/conf.d/30-elasticsearch.conf
+
+/usr/share/logstash/bin/logstash-plugin install logstash-input-beats
+
+systemctl restart logstash
+systemctl enable logstash
+
+# Install/Configure firewall
+sudo yum install firewalld -y
+sudo systemctl start firewalld
+sudo systemctl enable firewalld
+sudo firewall-cmd –zone=public –permanent –add-service=http
+sudo firewall-cmd –zone=public –permanent –add-service=https
+sudo firewall-cmd –zone=public –permanent –add-service=ssh
+sudo firewall-cmd –zone=public –permanent –add-port=5044/tcp
+sudo firewall-cmd –zone=public –permanent –add-port=9200/tcp
+sudo firewall-cmd –reload
+
